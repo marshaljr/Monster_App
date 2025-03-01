@@ -1,7 +1,6 @@
-import axios from "axios";
-import { useEffect, useState } from "react";
 import { Link, useParams } from "react-router-dom";
 import FavoriteButton from "./FavoriteButton";
+import { useQuery } from "@tanstack/react-query";
 
 interface Monster {
   index: string;
@@ -33,29 +32,20 @@ interface Monster {
 
 const MonsterDetail = () => {
   const { monsterIndex } = useParams<{ monsterIndex: string }>();
-  const [monsters, setMonsters] = useState<Monster>();
-  const [refresh, setRefresh] = useState(false);
 
-  useEffect(() => {
-    const fetchDetail = async () => {
-      try {
-        const response = await axios.get(
-          `https://www.dnd5eapi.co/api/monsters/${monsterIndex}`
-        );
-        const data = response.data;
-        setMonsters(data);
-      } catch (error) {
-        console.log(error);
-      }
-    };
-    fetchDetail();
-  }, [monsterIndex]);
+  const { isLoading, data, error } = useQuery<Monster>({
+    queryKey: ["monster", monsterIndex],
+    queryFn: async () => {
+      const response = await fetch(
+        `https://www.dnd5eapi.co/api/monsters/${monsterIndex}`
+      );
+      return response.json();
+    },
+  });
 
-  const refreshFavorites = () => {
-    setRefresh(!refresh);
-  };
-
-  if (!monsters) return <p>Loading...</p>;
+  if (isLoading) return <p>Loading...</p>;
+  if (error) return <p>Error: {error.message}</p>;
+  const monsters = data as Monster;
 
   return (
     <div className="p-6 bg-gray-800 text-white rounded-xl shadow-lg max-w-3xl mx-auto gap-8 flex flex-col w-full">
@@ -69,10 +59,7 @@ const MonsterDetail = () => {
         {monsters.size},{monsters.type},{monsters.alignment}
       </p>
       <span>
-        <FavoriteButton
-          monster={monsters}
-          onToggleFavorite={refreshFavorites}
-        />
+        <FavoriteButton monster={monsters} />
       </span>
       <span className="flex justify-center">
         <img
@@ -167,7 +154,7 @@ const MonsterDetail = () => {
         <strong>Actions : </strong>
         {monsters.actions.map((action, idx) => (
           <li key={idx}>
-            <strong>{action.name}</strong> : {action.desc}
+            <strong className="flex">{action.name}</strong> : {action.desc}
           </li>
         ))}
       </p>

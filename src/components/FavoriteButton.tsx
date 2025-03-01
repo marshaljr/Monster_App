@@ -1,7 +1,8 @@
-import React, { useEffect, useState } from "react";
+import React from "react";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import { faHeart as solidHeart } from "@fortawesome/free-solid-svg-icons";
 import { faHeart as regularHeart } from "@fortawesome/free-regular-svg-icons";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 
 interface Monster {
   index: string;
@@ -32,43 +33,37 @@ interface Monster {
 }
 interface FavoriteButtonProps {
   monster: Monster;
-  onToggleFavorite: () => void;
 }
 
-const FavoriteButton: React.FC<FavoriteButtonProps> = ({
-  monster,
-  onToggleFavorite,
-}) => {
-  const [isFavorite, setIsFavorite] = useState(false);
+const useFavorite = () => {
+  return useQuery({
+    queryKey: ["favorites"],
+    queryFn: () => JSON.parse(localStorage.getItem("favorites") || "[]"),
+  });
+};
 
-  useEffect(() => {
-    const favorites = JSON.parse(localStorage.getItem("favorites") || "[]");
-    const exists = favorites.some(
-      (fav: Monster) => fav.index === monster.index
-    );
-    setIsFavorite(exists);
-  }, [monster.index]);
+const FavoriteButton: React.FC<FavoriteButtonProps> = ({ monster }) => {
+  const queryClient = useQueryClient();
+  const { data: favorites = [] } = useFavorite();
 
-  const handleFavoriteToggle = () => {
-    const favorites = JSON.parse(localStorage.getItem("favorites") || "[]");
-    let updateFavorites;
+  const isFavorite = favorites.some(
+    (fav: Monster) => fav.index === monster.index
+  );
 
-    if (isFavorite) {
-      updateFavorites = favorites.filter(
-        (fav: Monster) => fav.index !== monster.index
-      );
-    } else {
-      updateFavorites = [...favorites, monster];
-    }
+  const mutation = useMutation({
+    mutationFn: (newFavorites: Monster) => {
+      const updateFavorites = isFavorite
+        ? favorites.filter((fav: Monster) => fav.index !== monster.index)
+        : [...favorites, newFavorites];
 
-    localStorage.setItem("favorites", JSON.stringify(updateFavorites));
-    setIsFavorite(!isFavorite);
-
-    onToggleFavorite();
-  };
+      localStorage.setItem("favorites", JSON.stringify(updateFavorites));
+      return updateFavorites;
+    },
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["favorites"] }),
+  });
 
   return (
-    <button onClick={handleFavoriteToggle}>
+    <button onClick={() => mutation.mutate(monster)}>
       <FontAwesomeIcon
         icon={isFavorite ? solidHeart : regularHeart}
         size="2x"

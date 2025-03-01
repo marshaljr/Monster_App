@@ -1,5 +1,6 @@
-import React, { useEffect, useState } from "react";
+import React from "react";
 import { Link } from "react-router-dom";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 
 interface Monster {
   index: string;
@@ -28,27 +29,32 @@ interface Monster {
   legendary_actions?: { name: string; desc: string }[];
   image: string;
 }
-
+const useFavorites = () => {
+  return useQuery({
+    queryKey: ["favorites"],
+    queryFn: () => {
+      return JSON.parse(localStorage.getItem("favorites") || "[]");
+    },
+  });
+};
 const FavoriteList: React.FC = () => {
-  const [favorites, setFavorite] = useState<Monster[]>([]);
+  const queryClient = useQueryClient();
+  const { data: favorites = [] } = useFavorites();
 
-  useEffect(() => {
-    const storedFavorites = JSON.parse(
-      localStorage.getItem("favorites") || "[]"
+  const addFavorite = (newFavorite: Monster) => {
+    const updateFavorites = [...favorites, newFavorite];
+    localStorage.setItem("favorites", JSON.stringify(updateFavorites));
+    queryClient.invalidateQueries({ queryKey: ["favorites"] });
+    return addFavorite;
+  };
+  const removeFavorite = (index: string) => {
+    const updateFavorites = favorites.filter(
+      (fav: Monster) => fav.index !== index
     );
-    setFavorite(storedFavorites);
-  }, []);
-
-  useEffect(() => {
-    const updateFavorites = () => {
-      const storedFavorites = JSON.parse(
-        localStorage.getItem("favorites") || "[]"
-      );
-      setFavorite(storedFavorites);
-    };
-    window.addEventListener("storage", updateFavorites);
-    return () => window.removeEventListener("storage", updateFavorites);
-  }, []);
+    localStorage.setItem("favorites", JSON.stringify(updateFavorites));
+    queryClient.invalidateQueries({ queryKey: ["favorites"] });
+    return removeFavorite;
+  };
 
   return (
     <div>
@@ -57,7 +63,7 @@ const FavoriteList: React.FC = () => {
         <p>No Favorite Monster yet!</p>
       ) : (
         <ul>
-          {favorites.map((monster) => (
+          {favorites.map((monster: Monster) => (
             <li key={monster.index}>
               <Link to={`/monster/${monster.index}`}>
                 <span>{monster.name}</span>
